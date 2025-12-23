@@ -10,8 +10,7 @@ cd fabric-samples/test-network
 test if running
 docker ps -a
 
-install the blockchain explorer
-git clone https://github.com/hyperledger/blockchain-explorer.git
-cd blockchain-explorer
-npm install
-npm start
+to stop the running testnet
+
+tharindu@thetharz:~/installations/fabric-samples/test-network$ ./network.sh down
+
