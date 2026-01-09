@@ -1,0 +1,24 @@
+{
+  "name": "project",
+  "version": "1.0.0",
+  "description": "> A system to mitigate false data injection in connected vehicles by using a blockchain-based vehicle reputation framework.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TheTharz/trust-aware-vehicular-blockchain.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/TheTharz/trust-aware-vehicular-blockchain/issues"
+  },
+  "homepage": "https://github.com/TheTharz/trust-aware-vehicular-blockchain#readme",
+  "dependencies": {
+    "fabric-contract-api": "^2.5.8",
+    "fabric-shim": "^2.5.8"
+  }
+}
