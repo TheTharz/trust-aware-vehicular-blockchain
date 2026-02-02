@@ -1,0 +1,48 @@
+{
+    "network-configs": {
+        "network-1": {
+            "name": "Test Network",
+            "profile": "./connection-profile.json"
+        }
+    },
+    "enableAuthentication": true,
+    "client": {
+        "tlsEnable": false,
+        "adminCredential": {
+            "id": "admin",
+            "password": "adminpw"
+        }
+    },
+    "license": "Apache-2.0",
+    "host": "0.0.0.0",
+    "port": 8080,
+    "logging": {
+        "level": "info",
+        "console": true,
+        "file": "log.txt",
+        "stack": true
+    },
+    "sync": {
+        "type": "local",
+        "platform": "fabric",
+        "period": 5,
+        "limit": 10,
+        "recover": {
+            "period": 60,
+            "limit": 10
+        }
+    },
+    "credentials": {
+        "wallet-name": "User1",
+        "wallet-path": "/tmp/wallet",
+        "wallet-connection-profile": {
+            "path": "./connection-profile.json"
+        },
+        "network-1": {
+            "Admin": {
+                "private_key": "/tmp/crypto/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/keystore/ADMIN_PRIVATE_KEY",
+                "signed_cert": "/tmp/crypto/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/signcerts/cert.pem"
+            }
+        }
+    }
+}
