@@ -242,42 +242,6 @@ class VehicleContract extends Contract {
     });
   }
 
-  async verifyReport(ctx, reportId, isValid) {
-    const reportBytes = await ctx.stub.getState(reportId);
-    if (!reportBytes || reportBytes.length === 0) {
-      throw new Error(`Report with id ${reportId} does not exist`);
-    }
-
-    const report = JSON.parse(reportBytes.toString());
-
-    if (report.status !== 'PENDING') {
-      throw new Error(`Report ${reportId} has already been verified`);
-    }
-
-    const vehicleBytes = await ctx.stub.getState(report.vehicleId);
-    if (!vehicleBytes || vehicleBytes.length === 0) {
-      throw new Error(`Vehicle ${report.vehicleId} associated with this report does not exist`);
-    }
-    const vehicle = JSON.parse(vehicleBytes.toString());
-
-    // Handle boolean input from CLI (which might be passed as string)
-    const isValidBool = (isValid === true || isValid === 'true');
-
-    if (isValidBool) {
-      vehicle.reputation += 5;
-      report.status = 'VALID';
-    } else {
-      vehicle.reputation -= 10;
-      vehicle.falseReports += 1;
-      report.status = 'FALSE';
-    }
-
-    await ctx.stub.putState(reportId, Buffer.from(JSON.stringify(report)));
-    await ctx.stub.putState(report.vehicleId, Buffer.from(JSON.stringify(vehicle)));
-
-    return JSON.stringify({ vehicle, report });
-  }
-
   // Calculate distance between two coordinates using Haversine formula
   calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371; // Earth's radius in kilometers
