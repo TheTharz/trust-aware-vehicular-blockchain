@@ -11,7 +11,8 @@ This project implements a **Digital Trust Book** using blockchain to manage vehi
 - Honest cars gain **reputation points**.
 - Dishonest cars lose points.
 - Immutable blockchain ensures the reputation history cannot be tampered with.
-- Proof-of-Authority (PoA) consensus allows **fast, energy-efficient, and secure updates** via trusted Road Side Units (RSUs).
+- **Pure Proof-of-Authority (PoA)** consensus: ONLY trusted Road Side Units (RSUs) can validate reports, preventing Sybil and false data injection attacks.
+- All vehicle-submitted reports remain PENDING until validated by registered RSUs.
 
 # Detailed
 

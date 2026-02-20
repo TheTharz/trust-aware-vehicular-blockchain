@@ -4,6 +4,12 @@ const { Contract } = require('fabric-contract-api');
 
 class VehicleContract extends Contract {
   
+  // Helper function to get deterministic timestamp from transaction
+  getTxTimestamp(ctx) {
+    const txTimestamp = ctx.stub.getTxTimestamp();
+    return new Date(txTimestamp.seconds.low * 1000).toISOString();
+  }
+  
   // Proof of Authority - Initialize RSU (Road Side Unit) registry
   async initAuthorities(ctx) {
     const authoritiesKey = 'RSU_REGISTRY';
@@ -21,7 +27,7 @@ class VehicleContract extends Contract {
     const rsuRegistry = {
       rsus: {},
       count: 0,
-      lastUpdated: new Date().toISOString()
+      lastUpdated: this.getTxTimestamp(ctx)
     };
     
     await ctx.stub.putState(authoritiesKey, Buffer.from(JSON.stringify(rsuRegistry)));
@@ -29,7 +35,7 @@ class VehicleContract extends Contract {
   }
   
   // Register a new RSU (Road Side Unit) as PoA validator
-  async registerRSU(ctx, rsuId, rsuMSPID, location, latitude, longitude) {
+  async registerRSU(ctx, rsuId, rsuMSPID, location, latitude, longitude, capabilities = 'FULL') {
     // Get caller identity
     const clientIdentity = ctx.clientIdentity;
     const callerID = clientIdentity.getID();
@@ -49,22 +55,27 @@ class VehicleContract extends Contract {
       throw new Error(`RSU ${rsuId} already registered`);
     }
     
-    // Register the RSU with location data
+    // Validate capabilities tier
+    const validCapabilities = ['FULL', 'PARTIAL', 'BASIC'];
+    const rsuCapabilities = validCapabilities.includes(capabilities) ? capabilities : 'FULL';
+    
+    // Register the RSU with location data and capabilities
     rsuRegistry.rsus[rsuId] = {
       rsuId,
       mspID: rsuMSPID,
-      identity: rsuId, // RSU identity for validation
+      identity: callerID, // Store actual caller identity for validation checks
       location,
       latitude: parseFloat(latitude),
       longitude: parseFloat(longitude),
-      registeredAt: new Date().toISOString(),
+      capabilities: rsuCapabilities, // FULL, PARTIAL, or BASIC
+      registeredAt: this.getTxTimestamp(ctx),
       registeredBy: callerID,
       validationCount: 0,
       status: 'ACTIVE'
     };
     
     rsuRegistry.count += 1;
-    rsuRegistry.lastUpdated = new Date().toISOString();
+    rsuRegistry.lastUpdated = this.getTxTimestamp(ctx);
     
     await ctx.stub.putState(authoritiesKey, Buffer.from(JSON.stringify(rsuRegistry)));
     return JSON.stringify({ message: 'RSU registered successfully', rsu: rsuRegistry.rsus[rsuId] });
@@ -91,8 +102,8 @@ class VehicleContract extends Contract {
     }
     
     rsuRegistry.rsus[rsuId].status = 'INACTIVE';
-    rsuRegistry.rsus[rsuId].deactivatedAt = new Date().toISOString();
-    rsuRegistry.lastUpdated = new Date().toISOString();
+    rsuRegistry.rsus[rsuId].deactivatedAt = this.getTxTimestamp(ctx);
+    rsuRegistry.lastUpdated = this.getTxTimestamp(ctx);
     
     await ctx.stub.putState(authoritiesKey, Buffer.from(JSON.stringify(rsuRegistry)));
     return JSON.stringify({ message: 'RSU deactivated successfully', rsu: rsuRegistry.rsus[rsuId] });
@@ -206,7 +217,7 @@ class VehicleContract extends Contract {
       location,
       latitude: parseFloat(latitude),
       longitude: parseFloat(longitude),
-      timeStamp: new Date().toISOString(),
+      timeStamp: this.getTxTimestamp(ctx),
       status: 'PENDING',
       corroboratingReports: [] // List of report IDs that match this location
     };
@@ -313,7 +324,7 @@ class VehicleContract extends Contract {
   }
 
   // Pure PoA validation - ONLY RSUs can validate reports (prevents Sybil/injection attacks)
-  async validateReportByRSU(ctx, reportId, isValid) {
+  async validateReportByRSU(ctx, reportId, isValid, validationMethod = 'MANUAL', confidence = 'HIGH', evidenceSources = []) {
     // Require that the caller is an active RSU
     await this.requireAuthority(ctx);
     const rsu = await this.getRSUFromCaller(ctx);
@@ -334,20 +345,38 @@ class VehicleContract extends Contract {
     const vehicle = JSON.parse(vehicleBytes.toString());
 
     const isValidBool = (isValid === true || isValid === 'true');
+    
+    // Parse evidence sources (can be stringified JSON or array)
+    let evidenceArray = [];
+    if (typeof evidenceSources === 'string' && evidenceSources.length > 0) {
+      try {
+        evidenceArray = JSON.parse(evidenceSources);
+      } catch (e) {
+        evidenceArray = [evidenceSources];
+      }
+    } else if (Array.isArray(evidenceSources)) {
+      evidenceArray = evidenceSources;
+    }
 
     if (isValidBool) {
       vehicle.reputation += 5;
       report.status = 'VALID';
       report.validatedBy = rsu.rsuId;
       report.validatedByLocation = rsu.location;
-      report.validatedAt = new Date().toISOString();
+      report.validatedAt = this.getTxTimestamp(ctx);
+      report.validationMethod = validationMethod; // CAMERA, SENSOR, MANUAL, AI_ASSISTED, CORROBORATION
+      report.validationConfidence = confidence; // HIGH, MEDIUM, LOW
+      report.evidenceSources = evidenceArray; // ['camera_feed_001', 'lidar_sensor_02', 'emergency_dispatch']
     } else {
       vehicle.reputation -= 10;
       vehicle.falseReports += 1;
       report.status = 'FALSE';
       report.rejectedBy = rsu.rsuId;
       report.rejectedByLocation = rsu.location;
-      report.rejectedAt = new Date().toISOString();
+      report.rejectedAt = this.getTxTimestamp(ctx);
+      report.validationMethod = validationMethod;
+      report.validationConfidence = confidence;
+      report.evidenceSources = evidenceArray;
     }
     
     // Update RSU validation count
@@ -355,7 +384,7 @@ class VehicleContract extends Contract {
     const rsuRegistryBytes = await ctx.stub.getState(authoritiesKey);
     const rsuRegistry = JSON.parse(rsuRegistryBytes.toString());
     rsuRegistry.rsus[rsu.rsuId].validationCount += 1;
-    rsuRegistry.rsus[rsu.rsuId].lastValidation = new Date().toISOString();
+    rsuRegistry.rsus[rsu.rsuId].lastValidation = this.getTxTimestamp(ctx);
     await ctx.stub.putState(authoritiesKey, Buffer.from(JSON.stringify(rsuRegistry)));
 
     await ctx.stub.putState(reportId, Buffer.from(JSON.stringify(report)));
@@ -560,6 +589,68 @@ class VehicleContract extends Contract {
       throw new Error(`Vehicle with id ${vehicleId} does not exist`);
     }
     return vehicleBytes.toString();
+  }
+
+  // Get all reports (for frontend display)
+  async queryAllReports(ctx) {
+    const iterator = await ctx.stub.getStateByRange('', '');
+    const allReports = [];
+
+    while (true) {
+      const result = await iterator.next();
+
+      if (result.value && result.value.value.toString()) {
+        const record = JSON.parse(result.value.value.toString());
+        
+        // Only include objects with reportId (to filter out vehicles, RSUs, etc.)
+        if (record.reportId) {
+          allReports.push(record);
+        }
+      }
+
+      if (result.done) {
+        await iterator.close();
+        break;
+      }
+    }
+
+    return JSON.stringify(allReports);
+  }
+
+  // Query pending reports (for frontend/RSU dashboard)
+  async queryPendingReports(ctx) {
+    return await this.getPendingReports(ctx);
+  }
+
+  // Get all vehicles (for frontend display)
+  async queryAllVehicles(ctx) {
+    const iterator = await ctx.stub.getStateByRange('', '');
+    const allVehicles = [];
+
+    while (true) {
+      const result = await iterator.next();
+
+      if (result.value && result.value.value.toString()) {
+        const record = JSON.parse(result.value.value.toString());
+        
+        // Only include objects with vehicleId (to filter out reports, RSUs, etc.)
+        if (record.vehicleId && !record.reportId) {
+          allVehicles.push(record);
+        }
+      }
+
+      if (result.done) {
+        await iterator.close();
+        break;
+      }
+    }
+
+    return JSON.stringify(allVehicles);
+  }
+
+  // Alias for queryAllVehicles
+  async getAllVehicles(ctx) {
+    return await this.queryAllVehicles(ctx);
   }
 }
 

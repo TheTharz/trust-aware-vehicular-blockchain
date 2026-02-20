@@ -30,6 +30,8 @@
   "homepage": "https://github.com/TheTharz/trust-aware-vehicular-blockchain#readme",
   "dependencies": {
     "fabric-contract-api": "^2.5.8",
-    "fabric-shim": "^2.5.8"
+    "fabric-shim": "^2.5.8",
+    "fabric-ca-client": "^2.2.20",
+    "fabric-network": "^2.2.20"
   }
 }
